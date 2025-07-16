@@ -1,0 +1,155 @@
+{
+  "name": "assembly-lab-manager",
+  "version": "1.0.0",
+  "description": "Lab Management and Instrument Control System",
+  "author": "PSI",
+  "main": "public/electron.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm start\" \"wait-on http://localhost:3001 && electron .\"",
+    "electron-pack": "electron-builder",
+    "preelectron-pack": "npm run build",
+    "build-backend": "cd backend && python build_backend.py",
+    "build-electron": "npm run build && npm run build-backend && electron-builder --win --x64",
+    "build-electron-unsigned": "npm run build && npm run build-backend && electron-builder --win --x64 --config.win.forceCodeSigning=false",
+    "build-electron-simple": "npm run build && npm run build-backend && electron-builder --win --x64 --config.buildDependenciesFromSource=false",
+    "build-all": "npm run build && npm run build-backend && electron-builder --publish=never",
+    "dist": "npm run build-all",
+    "clean-cache": "npx electron-builder install-app-deps --force && npm cache clean --force",
+    "clean-backend": "cd backend && rm -rf dist build *.spec",
+    "clean-all": "npm run clean-cache && npm run clean-backend && rm -rf dist build"
+  },
+  "build": {
+    "appId": "com.psi.maq-lab-manager",
+    "productName": "MAQ Lab Manager",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "build/**/*",
+      "public/electron.js",
+      "public/logo.ico",
+      "public/logo.ico",
+      "backend/dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!node_modules/electron/dist",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+      "!backend/**/*",
+      "backend/dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist",
+        "to": "backend/dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/logo.ico",
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MAQ Lab Manager",
+      "displayLanguageSelector": false,
+      "installerIcon": "public/logo.ico",
+      "uninstallerIcon": "public/logo.ico",
+      "allowElevation": false,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "menuCategory": false,
+      "include": false
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/logo.icns",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/logo.ico",
+      "category": "Science"
+    },
+    "compression": "normal",
+    "publish": null,
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "generateUpdatesFilesForAllChannels": false
+  },
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "electron-is-dev": "^2.0.0",
+    "lucide-react": "^0.525.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^3.1.0",
+    "web-vitals": "^2.1.4"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3",
+    "wait-on": "^7.2.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "keywords": [
+    "lab-management",
+    "instrument-control",
+    "testing",
+    "manufacturing",
+    "quality-control"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/assembly-lab-manager.git"
+  }
+}

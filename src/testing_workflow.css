@@ -617,3 +617,41 @@
   cursor: pointer;
   transition: all 0.2s ease;
 }
+/* Add this to your testing_workflow.css file */
+
+.device-type-summary.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 8px;
+  margin: -8px; /* Compensate for added padding */
+}
+
+.device-type-summary.clickable:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.device-type-summary.clickable:hover .device-type-name {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.device-type-summary.clickable:active {
+  transform: translateY(0);
+}
+
+/* Add a subtle indicator that it's clickable */
+.device-type-summary.clickable::after {
+  content: '→';
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-left: 4px;
+  color: #3b82f6;
+  font-weight: bold;
+}
+
+.device-type-summary.clickable:hover::after {
+  opacity: 1;
+}

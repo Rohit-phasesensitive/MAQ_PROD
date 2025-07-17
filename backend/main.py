@@ -19,6 +19,7 @@ import threading
 from contextlib import contextmanager
 from dotenv import load_dotenv
 from collections import defaultdict
+from modules.manufacturing_workflow_module import router as manufacturing_router
 # from apps import app as analytics_app
 # import os
 # from fastapi import FastAPI, HTTPException
@@ -594,10 +595,22 @@ def load_modules():
     except ImportError as e:
         print(f"⚠️  S21 testing module not found: {e}")
     # In load_modules() function, update the PO/MO section:
+    # try:
+    #     from modules.manufacturing_workflow_module import po_mo_router as manufacturing_workflow_router
+    #     manufacturing_workflow_router = manufacturing_workflow_router
+    #     app.include_router(manufacturing_workflow_router, prefix="/api/manufacturing", tags=["Manufacturing Workflow"])
+    #     print("✅ Manufacturing Workflow module loaded and registered")
+    # except ImportError as e:
+    #     print(f"⚠️  Manufacturing Workflow module not found: {e}")
+            # Load Manufacturing Workflow module
+   # Load Manufacturing Workflow module
+    # Load Manufacturing Workflow module
+    # Load Manufacturing Workflow module
     try:
-        from modules.manufacturing_workflow_module import po_mo_router as manufacturing_workflow_router
-        manufacturing_workflow_router = manufacturing_workflow_router
-        app.include_router(manufacturing_workflow_router, prefix="/api/manufacturing", tags=["Manufacturing Workflow"])
+        from modules.manufacturing_workflow_module import router as manufacturing_router, set_db_connection
+        # Pass the database connection function to the module
+        set_db_connection(get_db_connection)
+        app.include_router(manufacturing_router, prefix="/api/manufacturing", tags=["Manufacturing Workflow"])
         print("✅ Manufacturing Workflow module loaded and registered")
     except ImportError as e:
         print(f"⚠️  Manufacturing Workflow module not found: {e}")
@@ -1075,7 +1088,7 @@ async def shutdown_event():
     print("🧹 Session data cleared")
     
     print("✅ Shutdown complete")
-
+app.include_router(manufacturing_router)
 # Health check endpoint
 @app.get("/health")
 async def health_check():

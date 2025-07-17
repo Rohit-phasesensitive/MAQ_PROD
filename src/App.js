@@ -221,6 +221,52 @@ const MAQ_Lab_Manager = () => {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+  // Check for navigation from testing workflow
+  const checkTestNavigation = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const navigateTo = urlParams.get('navigateTo');
+    
+    if (navigateTo) {
+      // Map URLs to tab IDs
+      const urlToTabMap = {
+        'chip-inspection': 'chip-inspection',
+        'housing-prep': 'housing-prep', 
+        'wirebond': 'wirebond',
+        's11-testing': 's11-testing',
+        'fiberattach': 'fiber-attach',
+        'dcvpitesting': 'dcpi-testing',
+        's21-testing': 's21-testing',
+        'twotone-testing': 'twotone-testing',
+        'pd-attach': 'pd-attach',
+        'rfvpi-testing': 'rfvpi-testing'
+      };
+      
+      const targetTab = urlToTabMap[navigateTo];
+      if (targetTab) {
+        setActiveTab(targetTab);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        addNotification(`Navigated to ${targetTab.replace('-', ' ')} module`, 'info');
+      }
+    }
+    
+    // Check for return from test module
+    const returnFrom = urlParams.get('returnFrom');
+    const testCompleted = urlParams.get('testCompleted');
+    
+    if (returnFrom === 'testModule' && testCompleted) {
+      // Switch back to dashboard (which contains TestingWorkflowApp)
+      setActiveTab('dashboard');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      addNotification('Test completed successfully!', 'success');
+    }
+  };
+
+  checkTestNavigation();
+}, [addNotification]); // Add this as a dependency
+
   const checkAuthStatus = async () => {
     try {
       const token = localStorage.getItem('authToken');

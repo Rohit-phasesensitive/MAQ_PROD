@@ -681,3 +681,37 @@
     width: 100%;
   }
 }
+
+/* Add this to your ChipInspection.css file */
+
+.test-context-banner {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.test-info {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.test-info strong {
+  font-weight: 600;
+}
+
+.test-context-banner .btn {
+  margin-left: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.test-context-banner .btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

@@ -343,10 +343,103 @@ const TestingWorkflowApp = () => {
     return null;
   };
 
-  // Execute test
+  // Test ID to Module mapping - Updated to match your actual routes
+  const getModuleForTest = (testId) => {
+    const moduleMap = {
+      'LNBI': 'burnin',
+      'LNCHB': 'housingprep', 
+      'LNCHP': 'chip-inspection',  // This matches ChipInspection.js
+      'LNFR': 'finalprep',
+      'LNFT': 'finaltest',
+      'LNGP': 'gradeperformance',
+      'LNIT-01': 's11',
+      'LNIT-02': 'dcvpitesting',
+      'LNIT-03': 's21',
+      'LNIT-04': 'rfvpitesting', 
+      'LNIT-05': 'rfvpitesting',
+      'LNPC': 'polarattach',
+      'LNPD': 'pdattach',
+      'LNPDT': 'pdtesting',
+      'LNPTA': 'fiberattach',
+      'LNSL-LT': 'sealleak',
+      'LNWB-01': 'wirebond',
+      'LNWB-02': 'wirebond'
+    };
+    return moduleMap[testId] || null;
+  };
+
+  // Navigate to test module - Updated for tab-based navigation
+  const navigateToTestModule = async (testId, testName) => {
+    const moduleName = getModuleForTest(testId);
+    
+    if (!moduleName) {
+      alert(`No module found for test: ${testName}`);
+      return;
+    }
+
+    try {
+      // Start the test in backend
+      await apiCall(`/devices/${selectedDevice.serial_number}/tests/${testId}/start`, {
+        method: 'POST'
+      });
+
+      // Store current context in localStorage for return navigation
+      const testContext = {
+        deviceSerialNumber: selectedDevice.serial_number,
+        testId: testId,
+        testName: testName,
+        returnTo: 'testing-workflow',
+        selectedMO: selectedMO,
+        selectedDeviceType: selectedDeviceType,
+        mode: 'testing'
+      };
+      
+      localStorage.setItem('testContext', JSON.stringify(testContext));
+      
+      // Navigate using URL parameters that App.js will handle
+      window.location.href = `/?navigateTo=${moduleName}`;
+      
+    } catch (error) {
+      setError(`Failed to start test: ${error.message}`);
+    }
+  };
+
+  // Check for returning from test module
+  useEffect(() => {
+    const checkTestReturn = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const returnFrom = urlParams.get('returnFrom');
+      const testCompleted = urlParams.get('testCompleted');
+      
+      if (returnFrom === 'testModule' && testCompleted) {
+        const testContext = JSON.parse(localStorage.getItem('testContext') || '{}');
+        
+        if (testContext.deviceSerialNumber) {
+          // Reload device details to get updated progress
+          loadDeviceDetails(testContext.deviceSerialNumber);
+          
+          // Clean up
+          localStorage.removeItem('testContext');
+          
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Show success message
+          alert(`Test ${testContext.testName} completed successfully!`);
+        }
+      }
+    };
+
+    checkTestReturn();
+  }, []);
+
+  // Execute test - UPDATED to navigate to module
   const executeTest = (testId) => {
     if (selectedDevice) {
-      startTest(selectedDevice.serial_number, testId);
+      const nextTest = getNextTest();
+      if (nextTest && nextTest.id === testId) {
+        navigateToTestModule(testId, nextTest.name);
+      }
     }
   };
 
@@ -634,7 +727,7 @@ const TestingWorkflowApp = () => {
 
           <div className="card">
             <div style={{textAlign: 'center', padding: '40px'}}>
-              <div style={{marginBottom: '32px'}}>
+              {/* <div style={{marginBottom: '32px'}}>
                 <Package size={64} style={{color: '#3b82f6', margin: '0 auto 16px', display: 'block'}} />
                 <h2 style={{margin: '0 0 8px 0', fontSize: '1.5rem', fontWeight: '600'}}>
                   Device Management for {selectedDeviceType}
@@ -642,68 +735,33 @@ const TestingWorkflowApp = () => {
                 <p style={{margin: 0, color: '#64748b'}}>
                   View required tests and create or search for devices
                 </p>
-              </div>
-
-              {/* Show test preview for this device type */}
-              {deviceTestsPreview && (
-                <div style={{marginBottom: '32px', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'left'}}>
-                  <h3 style={{margin: '0 0 16px 0', fontSize: '1.1rem', textAlign: 'center'}}>
-                    Required Tests for {selectedDeviceType}:
-                  </h3>
-                  
-                  {deviceTestsPreview.summary && (
-                    <div style={{marginBottom: '16px', padding: '12px', backgroundColor: '#e0f2fe', borderRadius: '6px', fontSize: '0.9rem'}}>
-                      <strong>Summary:</strong> {deviceTestsPreview.summary.required_tests} required tests, 
-                      {deviceTestsPreview.summary.optional_tests} optional tests, 
-                      estimated time: {deviceTestsPreview.summary.estimated_total_hours} hours
-                    </div>
-                  )}
-
-                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px'}}>
-                    {deviceTestsPreview.tests?.filter(test => test.is_required).map((test) => (
-                      <div key={test.test_id} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '8px 12px',
-                        backgroundColor: 'white',
-                        borderRadius: '6px',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '0.85rem'
-                      }}>
-                        <span style={{marginRight: '8px', color: '#3b82f6'}}>
-                          {getTestIcon(test.test_id)}
-                        </span>
-                        <div style={{flex: 1}}>
-                          <div style={{fontWeight: '500'}}>{test.test_name}</div>
-                          <div style={{color: '#64748b', fontSize: '0.8rem'}}>
-                            Step {test.sequence_order} • {test.estimated_duration_minutes} min
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              </div> */}
+              
               <div style={{maxWidth: '400px', margin: '0 auto'}}>
                 <label style={{display: 'block', marginBottom: '8px', fontWeight: '500', textAlign: 'left'}}>
                   Device Serial Number
                 </label>
+                
                 <input
                   type="text"
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder={`Enter serial number (e.g., ${selectedDeviceType}-001)`}
+                  placeholder={`Enter serial number/ Chip serial number`}
+                  
                   style={{
                     width: '100%',
                     padding: '12px 16px',
                     border: '2px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '1rem',
-                    marginBottom: '24px'
+                    marginBottom: '10px'
                   }}
                   autoFocus
+                
                 />
+              <p style={{margin: 10, color: '#64748b'}}>
+                  <b>NOTE: </b> If new device Enter Chip Serial Number
+                </p>
 
                 <div style={{display: 'flex', gap: '12px'}}>
                   <button
@@ -753,6 +811,47 @@ const TestingWorkflowApp = () => {
                   </button>
                 </div>
               </div>
+              {/* Show test preview for this device type */}
+              {deviceTestsPreview && (
+                <div style={{marginBottom: '32px', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'left'}}>
+                  <h3 style={{margin: '0 0 16px 0', fontSize: '1.1rem', textAlign: 'center'}}>
+                    Required Tests for {selectedDeviceType}:
+                  </h3>
+                  
+                  {deviceTestsPreview.summary && (
+                    <div style={{marginBottom: '16px', padding: '12px', backgroundColor: '#e0f2fe', borderRadius: '6px', fontSize: '0.9rem'}}>
+                      <strong>Summary:</strong> {deviceTestsPreview.summary.required_tests} required tests, 
+                      {deviceTestsPreview.summary.optional_tests} optional tests, 
+                      estimated time: {deviceTestsPreview.summary.estimated_total_hours} hours
+                    </div>
+                  )}
+
+                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px'}}>
+                    {deviceTestsPreview.tests?.filter(test => test.is_required).map((test) => (
+                      <div key={test.test_id} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '0.85rem'
+                      }}>
+                        <span style={{marginRight: '8px', color: '#3b82f6'}}>
+                          {getTestIcon(test.test_id)}
+                        </span>
+                        <div style={{flex: 1}}>
+                          <div style={{fontWeight: '500'}}>{test.test_name}</div>
+                          <div style={{color: '#64748b', fontSize: '0.8rem'}}>
+                            Step {test.sequence_order} • {test.estimated_duration_minutes} min
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

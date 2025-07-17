@@ -1,4 +1,4 @@
-// src/modules/ChipInspection.js - Chip Inspection Module
+// src/modules/ChipInspection.js - Chip Inspection Module with Testing Workflow Integration
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
@@ -13,6 +13,10 @@ const ChipInspection = ({ user, addNotification }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef(null);
+  
+  // Testing workflow integration
+  const [testContext, setTestContext] = useState(null);
+  const [isTestMode, setIsTestMode] = useState(false);
   
   const [formData, setFormData] = useState({
     operator: user?.username || '',
@@ -38,9 +42,28 @@ const ChipInspection = ({ user, addNotification }) => {
   ];
 
   useEffect(() => {
+    // Check if we came from testing workflow
+    const storedTestContext = JSON.parse(localStorage.getItem('testContext') || '{}');
+    
+    if (storedTestContext.returnTo === 'testing-workflow') {
+      setTestContext(storedTestContext);
+      setIsTestMode(true);
+      
+      // Pre-fill form with device information if available
+      setFormData(prev => ({
+        ...prev,
+        chip_number: storedTestContext.deviceSerialNumber || '',
+        wafer_id: storedTestContext.deviceSerialNumber || '',
+        notes: `Test: ${storedTestContext.testName} for device ${storedTestContext.deviceSerialNumber}`
+      }));
+      
+      addNotification(`Starting ${storedTestContext.testName} for device ${storedTestContext.deviceSerialNumber}`, 'info');
+    }
+
     if (showHistory) {
       fetchInspections();
     }
+    
     // Set operator name from user context
     setFormData(prev => ({ ...prev, operator: user?.username || '' }));
   }, [user, filters, showHistory]);
@@ -120,6 +143,55 @@ const ChipInspection = ({ user, addNotification }) => {
     return true;
   };
 
+  // Handle test completion for testing workflow
+  const handleTestComplete = async () => {
+    if (!validateForm()) return;
+
+    setLoading(true);
+    
+    try {
+      // Save the inspection first
+      const inspectionData = new FormData();
+      inspectionData.append('operator', formData.operator);
+      inspectionData.append('chip_number', formData.chip_number);
+      inspectionData.append('wafer_id', formData.wafer_id);
+      inspectionData.append('notes', formData.notes);
+      inspectionData.append('status', 'completed'); // Auto-complete for test mode
+      
+      if (formData.image_file) {
+        inspectionData.append('image', formData.image_file);
+      }
+
+      // Save inspection
+      await axios.post(`${API_BASE_URL}/modules/chip_inspection/save`, inspectionData, {
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Complete the test in the manufacturing workflow
+      await fetch(`${API_BASE_URL}/api/manufacturing/devices/${testContext.deviceSerialNumber}/tests/${testContext.testId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      addNotification(`${testContext.testName} completed successfully!`, 'success');
+      
+      // Return to testing workflow with success flag
+      window.location.href = `/?returnFrom=testModule&testCompleted=true`;
+      
+    } catch (error) {
+      console.error('Error completing test:', error);
+      addNotification(error.response?.data?.detail || 'Failed to complete test', 'error');
+    }
+    setLoading(false);
+  };
+
+  // Regular save for non-test mode
   const saveInspection = async () => {
     if (user?.role === 'viewer') {
       addNotification('Viewers cannot save inspections', 'error');
@@ -245,17 +317,39 @@ const ChipInspection = ({ user, addNotification }) => {
       {/* Module Header */}
       <div className="module-header">
         <h2>🔍 Chip Inspection</h2>
-        <div className="module-actions">
-          <button 
-            onClick={() => setShowHistory(!showHistory)} 
-            className={`btn ${showHistory ? 'btn-secondary' : 'btn-primary'}`}
-          >
-            {showHistory ? 'Hide History' : 'Show History'}
-          </button>
-          {showHistory && (
-            <button onClick={generateReport} className="btn btn-success">
-              📊 Generate Report
+        
+        {/* Test Context Banner */}
+        {isTestMode && testContext && (
+          <div className="test-context-banner">
+            <div className="test-info">
+              <strong>🧪 Testing Mode:</strong> {testContext.testName} 
+              <br />
+              <strong>Device:</strong> {testContext.deviceSerialNumber}
+            </div>
+            <button 
+              onClick={() => window.location.href = '/testing-workflow'}
+              className="btn btn-secondary btn-sm"
+            >
+              ← Back to Workflow
             </button>
+          </div>
+        )}
+        
+        <div className="module-actions">
+          {!isTestMode && (
+            <>
+              <button 
+                onClick={() => setShowHistory(!showHistory)} 
+                className={`btn ${showHistory ? 'btn-secondary' : 'btn-primary'}`}
+              >
+                {showHistory ? 'Hide History' : 'Show History'}
+              </button>
+              {showHistory && (
+                <button onClick={generateReport} className="btn btn-success">
+                  📊 Generate Report
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -263,7 +357,7 @@ const ChipInspection = ({ user, addNotification }) => {
       <div className="module-content">
         {/* Inspection Form */}
         <div className="card">
-          <h3>New Chip Inspection</h3>
+          <h3>{isTestMode ? `${testContext?.testName} - Chip Inspection` : 'New Chip Inspection'}</h3>
           <div className="form-grid">
             <div className="form-group">
               <label>Operator *</label>
@@ -298,21 +392,23 @@ const ChipInspection = ({ user, addNotification }) => {
               />
             </div>
 
-            <div className="form-group">
-              <label>Status *</label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                disabled={user?.role === 'viewer'}
-                style={{ color: getStatusColor(formData.status) }}
-              >
-                {statusOptions.map(option => (
-                  <option key={option.value} value={option.value} style={{ color: option.color }}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!isTestMode && (
+              <div className="form-group">
+                <label>Status *</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  disabled={user?.role === 'viewer'}
+                  style={{ color: getStatusColor(formData.status) }}
+                >
+                  {statusOptions.map(option => (
+                    <option key={option.value} value={option.value} style={{ color: option.color }}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="form-group full-width">
               <label>Notes</label>
@@ -377,18 +473,24 @@ const ChipInspection = ({ user, addNotification }) => {
           {user?.role !== 'viewer' && (
             <div className="button-group">
               <button 
-                onClick={saveInspection} 
+                onClick={isTestMode ? handleTestComplete : saveInspection} 
                 disabled={loading}
-                className="btn btn-primary"
+                className={`btn ${isTestMode ? 'btn-success' : 'btn-primary'}`}
               >
-                {loading ? 'Saving...' : '💾 Save Inspection'}
+                {loading ? (
+                  'Processing...'
+                ) : isTestMode ? (
+                  '✅ Complete Test & Return'
+                ) : (
+                  '💾 Save Inspection'
+                )}
               </button>
             </div>
           )}
         </div>
 
-        {/* Inspection History */}
-        {showHistory && (
+        {/* Inspection History - Hidden in test mode */}
+        {showHistory && !isTestMode && (
           <div className="card">
             <div className="history-header">
               <h3>Inspection History</h3>

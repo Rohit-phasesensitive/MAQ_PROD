@@ -316,7 +316,7 @@ const ChipInspection = ({ user, addNotification }) => {
     <div className="chip_inspection-module">
       {/* Module Header */}
       <div className="module-header">
-        <h2>🔍 Chip Inspection</h2>
+        <h2>🔍 Chip Preparation</h2>
         
         {/* Test Context Banner */}
         {isTestMode && testContext && (

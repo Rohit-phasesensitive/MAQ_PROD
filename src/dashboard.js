@@ -124,7 +124,7 @@ const DebugPanel = ({ systemStatus, analyticsData, isVisible, onToggle }) => {
         </button>
       </div>
       
-      <div style={{ padding: '15px' }}>
+      {/* <div style={{ padding: '15px' }}>
         <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#374151' }}>System Status Raw Data:</h4>
         <pre style={{
           backgroundColor: '#f9fafb',
@@ -147,7 +147,7 @@ const DebugPanel = ({ systemStatus, analyticsData, isVisible, onToggle }) => {
         }}>
           {JSON.stringify(analyticsData, null, 2)}
         </pre>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -419,7 +419,7 @@ const ConnectedDashboard = () => {
     { name: 'Wire Bond', ...processStageData(analyticsData.wireBond) },
     { name: 'S11 Testing', ...processStageData(analyticsData.s11Testing) },
     { name: 'Fiber Attach', ...processStageData(analyticsData.fiberAttach) },
-    { name: 'DC/PI Testing', ...processStageData(analyticsData.dcpiTesting) }
+    { name: 'DCVπ Testing', ...processStageData(analyticsData.dcpiTesting) }
   ].map(stage => ({
     ...stage,
     successRate: stage.totalProcessed > 0 ? ((stage.passed / stage.totalProcessed) * 100).toFixed(1) : 0
@@ -452,13 +452,7 @@ const ConnectedDashboard = () => {
           }}>
             Production Analytics
           </h1>
-          <p style={{
-            margin: '4px 0 0 0',
-            color: '#6b7280',
-            fontSize: '14px'
-          }}>
-            Real-time data from your production system
-          </p>
+          {/*  */}
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -491,7 +485,7 @@ const ConnectedDashboard = () => {
                 fontSize: '14px'
               }}
             >
-              Stage Details
+              Station Performance
             </button>
             <button
               onClick={handleRetry}
@@ -552,7 +546,7 @@ const ConnectedDashboard = () => {
               </div>
             </div>
             
-            <div style={{
+            {/* <div style={{
               background: 'white',
               borderRadius: '8px',
               padding: '20px',
@@ -566,23 +560,9 @@ const ConnectedDashboard = () => {
               <div style={{ fontSize: '12px', color: '#6b7280' }}>
                 {systemStatus?.overall === 'healthy' ? 'All systems operational' : 'Check system components'}
               </div>
-            </div>
+            </div> */}
             
-            <div style={{
-              background: 'white',
-              borderRadius: '8px',
-              padding: '20px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              border: '1px solid #e5e7eb'
-            }}>
-              <h3 style={{ margin: '0 0 12px 0', color: '#1f2937', fontSize: '16px' }}>👥 Active Users</h3>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: '#1f2937' }}>
-                {systemStatus?.active_users || 0}
-              </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Currently online
-              </div>
-            </div>
+            
           </div>
 
           {/* Charts */}
@@ -698,7 +678,7 @@ const ConnectedDashboard = () => {
             onRetry={handleRetry}
           />
           <StageAnalyticsCard
-            title="DC/PI Testing"
+            title="DCVπ Testing"
             data={analyticsData?.dcpiTesting || {}}
             icon="📊"
             isLoading={isLoading}
@@ -708,13 +688,13 @@ const ConnectedDashboard = () => {
         </div>
       )}
 
-      {/* Debug Panel */}
+      {/* Debug Panel
       <DebugPanel 
         systemStatus={systemStatus}
         analyticsData={analyticsData}
         isVisible={showDebug}
-        onToggle={() => setShowDebug(!showDebug)}
-      />
+      //   onToggle={() => setShowDebug(!showDebug)} */}
+      
     </div>
   );
 };

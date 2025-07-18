@@ -717,8 +717,8 @@ const TestingWorkflowApp = () => {
                 Back to Device Types
               </button>
               <div>
-                <h1 className="header-title">Device Management for {selectedDeviceType}</h1>
-                <p className="header-subtitle">{selectedMO?.manufacturing_order_number} - {selectedDeviceType}</p>
+                <h1 className="header-title">{selectedMO?.manufacturing_order_number} - {selectedDeviceType}</h1>
+                
               </div>
             </div>
           </div>

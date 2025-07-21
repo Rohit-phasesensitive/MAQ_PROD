@@ -456,7 +456,7 @@ const ConnectedDashboard = () => {
         </div>
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <ConnectionStatus isConnected={isConnected} isLoading={isLoading} />
+          {/* <ConnectionStatus isConnected={isConnected} isLoading={isLoading} /> */}
           
           <div style={{ display: 'flex', gap: '8px' }}>
             <button

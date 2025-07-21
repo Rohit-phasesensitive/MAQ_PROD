@@ -317,8 +317,13 @@ const ChipInspection = ({ user, addNotification }) => {
       {/* Module Header */}
       <div className="module-header">
         <h2>🔍 Chip Preparation</h2>
-        
-        {/* Test Context Banner */}
+        <button 
+              onClick={() => window.location.href = '/testing-workflow'}
+              className="btn btn-secondary btn-sm"
+            >
+              ← Back to Workflow
+            </button>
+        {/* {Test Context Banner */}
         {isTestMode && testContext && (
           <div className="test-context-banner">
             <div className="test-info">
@@ -333,7 +338,7 @@ const ChipInspection = ({ user, addNotification }) => {
               ← Back to Workflow
             </button>
           </div>
-        )}
+        )} 
         
         <div className="module-actions">
           {!isTestMode && (

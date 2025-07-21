@@ -252,6 +252,12 @@ const Housingprep = ({ user, addNotification }) => {
           >
             {showHistory ? 'Hide History' : 'Show History'}
           </button>
+        <button 
+  onClick={() => window.location.href = '/testing-workflow'}
+  className="btn btn-secondary btn-sm"
+>
+  ← Back to Workflow
+</button>
           {showHistory && (
             <button onClick={generateReport} className="btn btn-success">
               📊 Generate Report

@@ -594,6 +594,13 @@ def load_modules():
         print("✅ S21 testing module loaded and registered")
     except ImportError as e:
         print(f"⚠️  S21 testing module not found: {e}")
+    
+    try:
+        from modules.dcvpitestmodule import modulator_router
+        app.include_router(modulator_router, prefix="/api/modulator", tags=["Modulator Testing"])
+        print("✅ Dc Vpi test module loaded and registered")
+    except ImportError as e:
+        print(f"⚠️  Dc Vpi test module not found: {e}")
     # In load_modules() function, update the PO/MO section:
     # try:
     #     from modules.manufacturing_workflow_module import po_mo_router as manufacturing_workflow_router

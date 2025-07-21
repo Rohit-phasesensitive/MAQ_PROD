@@ -530,20 +530,93 @@ async def get_test_definitions():
 
 @router.get("/devices/{serial_number}")
 async def get_device_details(serial_number: str):
-    """Get device details - fetch required tests from device_test_sequences table"""
+    """Get device details - now uses stored device_type and required_tests"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
-            # 1. Determine device type from serial number
-            device_type = get_device_type_from_serial(serial_number)
-            if not device_type:
+            # Get device with all fields including device_type and required_tests
+            cursor.execute("""
+                SELECT serial_number, current_stage, completed_tests, device_type, required_tests
+                FROM devices 
+                WHERE serial_number = %s
+            """, (serial_number,))
+            
+            device_row = cursor.fetchone()
+            
+            if not device_row:
                 raise HTTPException(
-                    status_code=400, 
-                    detail=f"Cannot determine device type from serial number: {serial_number}"
+                    status_code=404, 
+                    detail=f"Device {serial_number} not found"
                 )
             
-            # 2. Get required tests from device_test_sequences table
+            # Use stored data
+            completed_steps = list(device_row['completed_tests'] or [])
+            required_tests = list(device_row['required_tests'] or [])
+            device_type = device_row['device_type']
+            
+            # Determine status
+            if device_row['current_stage'] == 'completed':
+                status = "completed"
+            elif completed_steps:
+                status = "in_progress"
+            else:
+                status = "not_started"
+            
+            device_info = {
+                "serial_number": device_row['serial_number'],
+                "device_type": device_type,
+                "manufacturing_order_number": None,
+                "status": status,
+                "current_step": device_row['current_stage'],
+                "completed_steps": completed_steps,
+                "required_tests": required_tests,
+                "created_at": None
+            }
+            
+            return {"device": device_info}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting device details for {serial_number}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/devices/create")
+async def create_device_simple(
+    serial_number: str,
+    device_type: str,  # NOW REQUIRED
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new device with test sequence based on device type"""
+    try:
+        logger.info(f"Creating device: {serial_number} of type: {device_type}")
+        
+        # Validate inputs
+        if not serial_number or not serial_number.strip():
+            raise HTTPException(status_code=400, detail="Serial number is required")
+        
+        if not device_type or not device_type.strip():
+            raise HTTPException(status_code=400, detail="Device type is required")
+        
+        serial_number = serial_number.strip()
+        device_type = device_type.strip()
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Check if device already exists
+            cursor.execute("""
+                SELECT serial_number FROM devices WHERE serial_number = %s
+            """, (serial_number,))
+            
+            if cursor.fetchone():
+                raise HTTPException(
+                    status_code=409, 
+                    detail=f"Device {serial_number} already exists"
+                )
+            
+            # Get test sequence for this device type
             cursor.execute("""
                 SELECT test_sequence 
                 FROM device_test_sequences 
@@ -557,118 +630,70 @@ async def get_device_details(serial_number: str):
                     detail=f"No test sequence found for device type: {device_type}"
                 )
             
-            # Parse the JSONB test sequence
+            # Parse the test sequence
             test_sequences = test_seq_result['test_sequence']
             required_tests = []
+            first_test = 'not_started'
             
             if isinstance(test_sequences, list):
                 test_sequences.sort(key=lambda x: int(x.get('sequence_order', 0)))
-                required_tests = [
-                    test['test_id'] for test in test_sequences 
-                    if test.get('is_required') == 'true' or test.get('is_required') is True
-                ]
-            
-            # 3. Check if device exists in devices table
-            cursor.execute("""
-                SELECT serial_number, current_stage, completed_tests
-                FROM devices 
-                WHERE serial_number = %s
-            """, (serial_number,))
-            
-            device_row = cursor.fetchone()
-            
-            if not device_row:
-                raise HTTPException(
-                    status_code=404, 
-                    detail=f"Device {serial_number} not found"
-                )
-            
-            # 4. Process existing device
-            completed_steps = list(device_row['completed_tests'] or [])
-            
-            # Determine status
-            if not completed_steps:
-                status = "not_started"
-            elif len(completed_steps) >= len(required_tests):
-                status = "completed" 
-            else:
-                status = "in_progress"
-            
-            device_info = {
-                "serial_number": device_row['serial_number'],
-                "device_type": device_type,
-                "manufacturing_order_number": None,  # Not in your actual table
-                "status": status,
-                "current_step": device_row['current_stage'],
-                "completed_steps": completed_steps,
-                "required_tests": required_tests,
-                "created_at": None  # Not in your actual table
-            }
-            
-            return {"device": device_info}
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting device details for {serial_number}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/devices/create")
-async def create_device_simple(serial_number: str, device_type: str):
-    """Create a new device with default test sequence for the device type"""
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            
-            # Verify device type exists and get test sequence
-            cursor.execute("""
-                SELECT test_sequence 
-                FROM device_test_sequences 
-                WHERE device_type = %s
-            """, (device_type,))
-            
-            result = cursor.fetchone()
-            if not result:
-                raise HTTPException(status_code=404, detail=f"Device type {device_type} not found")
-            
-            test_sequences = result['test_sequence']
-            if isinstance(test_sequences, list):
-                test_sequences.sort(key=lambda x: int(x.get('sequence_order', 0)))
-                # Get first required test
-                first_test = None
+                
+                # Get required tests in order
                 for test in test_sequences:
                     is_required = test.get('is_required', True)
                     if isinstance(is_required, str):
                         is_required = is_required.lower() == 'true'
                     if is_required:
-                        first_test = test['test_id']
-                        break
-            else:
-                first_test = None
+                        required_tests.append(test['test_id'])
+                
+                # Set first test as current stage
+                if required_tests:
+                    first_test = required_tests[0]
             
-            # Insert device into your actual devices table structure
+            # Insert device with test sequence
             cursor.execute("""
-                INSERT INTO devices (serial_number, current_stage, completed_tests)
-                VALUES (%s, %s, %s)
-            """, (serial_number, first_test, []))
+                INSERT INTO devices (
+                    serial_number, 
+                    current_stage, 
+                    completed_tests,
+                    device_type,
+                    required_tests
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING serial_number, current_stage, completed_tests, device_type, required_tests
+            """, (serial_number, first_test, [], device_type, required_tests))
             
+            new_device = cursor.fetchone()
             conn.commit()
+            
+            logger.info(f"Device created successfully: {dict(new_device)}")
+            
+            # Log the action
+            log_action(
+                current_user['user_id'],
+                'create_device',
+                'manufacturing_workflow',
+                f"Created {device_type} device {serial_number} with {len(required_tests)} required tests"
+            )
             
             return {
                 "message": f"Device {serial_number} created successfully",
                 "device": {
-                    "serial_number": serial_number,
-                    "device_type": device_type,
+                    "serial_number": new_device['serial_number'],
+                    "device_type": new_device['device_type'],
                     "status": "not_started",
-                    "current_stage": first_test
+                    "current_stage": new_device['current_stage'],
+                    "completed_tests": new_device['completed_tests'],
+                    "required_tests": new_device['required_tests']
                 }
             }
             
+    except HTTPException:
+        raise
     except Exception as e:
-        if "already exists" in str(e) or "duplicate" in str(e):
-            raise HTTPException(status_code=409, detail=f"Device {serial_number} already exists")
         logger.error(f"Error creating device {serial_number}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/devices/register")
 async def register_device(device_data: DeviceRegistration):
@@ -705,32 +730,35 @@ async def register_device(device_data: DeviceRegistration):
 
 @router.post("/devices/{serial_number}/tests/{test_id}/start")
 async def start_test(serial_number: str, test_id: str):
-    """Start a test for a device using your actual table structure"""
+    """Start a test for a device - No device type validation"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             
-            # Update current_stage in your devices table
-            update_device = """
-            UPDATE devices 
-            SET current_stage = %s
-            WHERE serial_number = %s
-            """
+            # Check if device exists
+            cursor.execute("""
+                SELECT serial_number FROM devices WHERE serial_number = %s
+            """, (serial_number,))
             
-            cursor.execute(update_device, (test_id, serial_number))
-            
-            if cursor.rowcount == 0:
+            if not cursor.fetchone():
                 raise HTTPException(
                     status_code=404,
                     detail=f"Device {serial_number} not found"
                 )
             
+            # Update current_stage
+            cursor.execute("""
+                UPDATE devices 
+                SET current_stage = %s
+                WHERE serial_number = %s
+            """, (test_id, serial_number))
+            
             conn.commit()
             
-            return ApiResponse(
-                message="Test started successfully",
-                data={"test_id": test_id, "status": "running"}
-            )
+            return {
+                "message": "Test started successfully",
+                "data": {"test_id": test_id, "status": "running"}
+            }
             
     except HTTPException:
         raise
@@ -740,18 +768,17 @@ async def start_test(serial_number: str, test_id: str):
 
 @router.get("/devices/{serial_number}/tests/{test_id}/status")
 async def get_test_status(serial_number: str, test_id: str):
-    """Get current status of a test using your actual table structure"""
+    """Get current status of a test - No device type validation"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
-            query = """
-            SELECT current_stage, completed_tests
-            FROM devices 
-            WHERE serial_number = %s
-            """
+            cursor.execute("""
+                SELECT current_stage, completed_tests
+                FROM devices 
+                WHERE serial_number = %s
+            """, (serial_number,))
             
-            cursor.execute(query, (serial_number,))
             result = cursor.fetchone()
             
             if not result:
@@ -788,7 +815,7 @@ async def get_test_status(serial_number: str, test_id: str):
 
 @router.post("/devices/{serial_number}/tests/{test_id}/complete")
 async def complete_test(serial_number: str, test_id: str):
-    """Complete a test for a device using your actual table structure"""
+    """Complete a test for a device - No device type validation"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -810,51 +837,23 @@ async def complete_test(serial_number: str, test_id: str):
             if test_id not in completed_tests:
                 completed_tests.append(test_id)
             
-            # Get device type and required tests to find next test
-            device_type = get_device_type_from_serial(serial_number)
-            if device_type:
-                cursor.execute("""
-                    SELECT test_sequence 
-                    FROM device_test_sequences 
-                    WHERE device_type = %s
-                """, (device_type,))
-                
-                test_seq_result = cursor.fetchone()
-                if test_seq_result:
-                    test_sequences = test_seq_result['test_sequence']
-                    if isinstance(test_sequences, list):
-                        test_sequences.sort(key=lambda x: int(x.get('sequence_order', 0)))
-                        required_tests = [
-                            test['test_id'] for test in test_sequences 
-                            if test.get('is_required') == 'true' or test.get('is_required') is True
-                        ]
-                        
-                        # Find next test
-                        try:
-                            current_index = required_tests.index(test_id)
-                            next_test = required_tests[current_index + 1] if current_index + 1 < len(required_tests) else 'completed'
-                        except ValueError:
-                            next_test = 'completed'
-                    else:
-                        next_test = 'completed'
-                else:
-                    next_test = 'completed'
-            else:
-                next_test = 'completed'
+            # Set next stage to 'completed' or manual selection
+            # Since we don't have device type validation, operator will manually select next test
+            next_stage = 'completed'  # Default to completed, operator can change manually
             
             # Update device
             cursor.execute("""
                 UPDATE devices 
                 SET completed_tests = %s, current_stage = %s
                 WHERE serial_number = %s
-            """, (completed_tests, next_test, serial_number))
+            """, (completed_tests, next_stage, serial_number))
             
             conn.commit()
             
-            return ApiResponse(
-                message=f"Test {test_id} completed successfully",
-                data={"test_id": test_id, "status": "completed", "next_test": next_test}
-            )
+            return {
+                "message": f"Test {test_id} completed successfully",
+                "data": {"test_id": test_id, "status": "completed", "next_test": next_stage}
+            }
             
     except HTTPException:
         raise
@@ -862,32 +861,434 @@ async def complete_test(serial_number: str, test_id: str):
         logger.error(f"Error completing test {test_id} for device {serial_number}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Debug Endpoints
-@router.get("/debug/devices")
-async def debug_existing_devices():
-    """Debug endpoint to see existing devices in your actual table"""
+@router.get("/devices")
+async def get_all_devices(limit: int = 50, offset: int = 0):
+    """Get all devices - No device type validation"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
-            query = """
-            SELECT serial_number, current_stage, completed_tests
-            FROM devices 
-            ORDER BY serial_number
-            LIMIT 20
-            """
+            # Get devices with pagination
+            cursor.execute("""
+                SELECT serial_number, current_stage, completed_tests
+                FROM devices 
+                ORDER BY serial_number
+                LIMIT %s OFFSET %s
+            """, (limit, offset))
             
-            cursor.execute(query)
             devices = cursor.fetchall()
             
             device_list = []
             for device in devices:
-                device_type = get_device_type_from_serial(device['serial_number'])
+                completed_tests = device['completed_tests'] or []
+                
+                # Get test name for current stage if it exists
+                current_test_name = None
+                if device['current_stage'] and device['current_stage'] not in ['not_started', 'completed']:
+                    cursor.execute("""
+                        SELECT test_name FROM test_definitions 
+                        WHERE test_id = %s
+                    """, (device['current_stage'],))
+                    test_def = cursor.fetchone()
+                    if test_def:
+                        current_test_name = test_def['test_name']
+                
+                # Determine status
+                if device['current_stage'] == 'completed':
+                    status = "completed"
+                elif completed_tests:
+                    status = "in_progress"
+                else:
+                    status = "not_started"
+                
+                device_list.append({
+                    "serial_number": device['serial_number'],
+                    "device_type": None,  # Not needed
+                    "current_stage": device['current_stage'],
+                    "current_test_name": current_test_name,
+                    "completed_tests_count": len(completed_tests),
+                    "completed_tests": completed_tests,
+                    "status": status
+                })
+            
+            # Get total count
+            cursor.execute("SELECT COUNT(*) FROM devices")
+            total_count = cursor.fetchone()['count']
+            
+            return {
+                "devices": device_list,
+                "total_count": total_count,
+                "limit": limit,
+                "offset": offset
+            }
+            
+    except Exception as e:
+        logger.error(f"Error getting all devices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Additional backend endpoints to support the enhanced frontend
+
+# Add these endpoints to manufacturing_workflow_module.py
+
+# @router.get("/devices/by-type/{device_type}")
+# async def get_devices_by_type(
+#     device_type: str,
+#     mo_number: Optional[str] = None,
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """Get all devices for a specific device type, optionally filtered by MO"""
+#     try:
+#         with get_db_connection() as conn:
+#             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+#             # Base query to get devices
+#             base_query = """
+#                 SELECT d.serial_number, d.current_stage, d.completed_tests,
+#                        CASE 
+#                            WHEN d.current_stage = 'completed' THEN 'completed'
+#                            WHEN array_length(d.completed_tests, 1) > 0 THEN 'in_progress'
+#                            ELSE 'not_started'
+#                        END as status
+#                 FROM devices d
+#                 WHERE 1=1
+#             """
+            
+#             params = []
+            
+#             # Filter by device type - check if serial number starts with device type
+#             # Since we removed device type validation, we'll use pattern matching
+#             if device_type:
+#                 base_query += " AND (d.serial_number LIKE %s OR d.serial_number LIKE %s)"
+#                 params.extend([f"{device_type}%", f"{device_type}-%"])
+            
+#             # Add MO filtering if needed (you can implement this based on your schema)
+#             # For now, we'll skip MO filtering since devices table doesn't have MO reference
+            
+#             base_query += " ORDER BY d.serial_number"
+            
+#             cursor.execute(base_query, params)
+#             devices = cursor.fetchall()
+            
+#             device_list = []
+#             for device in devices:
+#                 completed_tests = device['completed_tests'] or []
+                
+#                 # Get current test name if available
+#                 current_test_name = None
+#                 if device['current_stage'] and device['current_stage'] not in ['not_started', 'completed']:
+#                     cursor.execute("""
+#                         SELECT test_name FROM test_definitions 
+#                         WHERE test_id = %s
+#                     """, (device['current_stage'],))
+#                     test_def = cursor.fetchone()
+#                     if test_def:
+#                         current_test_name = test_def['test_name']
+                
+#                 device_list.append({
+#                     "serial_number": device['serial_number'],
+#                     "device_type": device_type,
+#                     "current_stage": device['current_stage'],
+#                     "current_test_name": current_test_name,
+#                     "completed_tests_count": len(completed_tests),
+#                     "completed_tests": completed_tests,
+#                     "status": device['status']
+#                 })
+            
+#             log_action(
+#                 current_user['user_id'], 
+#                 'list_devices_by_type', 
+#                 'manufacturing_workflow', 
+#                 f"Retrieved {len(device_list)} devices for type {device_type}"
+#             )
+            
+#             return {
+#                 "device_type": device_type,
+#                 "mo_number": mo_number,
+#                 "devices": device_list,
+#                 "total_count": len(device_list)
+#             }
+            
+#     except Exception as e:
+#         logger.error(f"Error getting devices for type {device_type}: {e}")
+#         raise HTTPException(status_code=500, detail=str(e))
+@router.get("/pdf/{filename}")
+async def serve_pdf(filename: str):
+    """Serve PDF files"""
+    file_path = os.path.join("procedures", filename)
+    if os.path.exists(file_path):
+        return FileResponse(
+            file_path,
+            media_type='application/pdf',
+            headers={"Content-Disposition": f"inline; filename={filename}"}
+        )
+    else:
+        raise HTTPException(status_code=404, detail="PDF not found")
+@router.get("/devices/{serial_number}/next-step")
+async def get_device_next_step(
+    serial_number: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the next test step for a device"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Get device details
+            cursor.execute("""
+                SELECT serial_number, current_stage, completed_tests
+                FROM devices 
+                WHERE serial_number = %s
+            """, (serial_number,))
+            
+            device = cursor.fetchone()
+            if not device:
+                raise HTTPException(status_code=404, detail=f"Device {serial_number} not found")
+            
+            current_stage = device['current_stage']
+            completed_tests = device['completed_tests'] or []
+            
+            # Determine next step
+            if current_stage == 'completed':
+                next_step = None
+                next_step_name = "All tests completed"
+            elif current_stage == 'not_started':
+                next_step = "not_started"
+                next_step_name = "Ready to start first test"
+            elif current_stage:
+                # Get test name for current stage
+                cursor.execute("""
+                    SELECT test_name FROM test_definitions 
+                    WHERE test_id = %s
+                """, (current_stage,))
+                test_def = cursor.fetchone()
+                next_step = current_stage
+                next_step_name = test_def['test_name'] if test_def else current_stage
+            else:
+                next_step = None
+                next_step_name = "No next step defined"
+            
+            return {
+                "serial_number": serial_number,
+                "current_stage": current_stage,
+                "next_step": next_step,
+                "next_step_name": next_step_name,
+                "completed_tests_count": len(completed_tests),
+                "can_continue": next_step is not None and next_step != "completed"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting next step for {serial_number}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/devices/{serial_number}/continue")
+async def continue_device_testing(
+    serial_number: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark that user wants to continue testing this device"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Get device current stage
+            cursor.execute("""
+                SELECT current_stage FROM devices 
+                WHERE serial_number = %s
+            """, (serial_number,))
+            
+            device = cursor.fetchone()
+            if not device:
+                raise HTTPException(status_code=404, detail=f"Device {serial_number} not found")
+            
+            current_stage = device['current_stage']
+            
+            if not current_stage or current_stage in ['completed', 'not_started']:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Device has no active test to continue"
+                )
+            
+            # Log the continue action
+            log_action(
+                current_user['user_id'],
+                'continue_testing',
+                'manufacturing_workflow',
+                f"User continued testing for device {serial_number} at stage {current_stage}"
+            )
+            
+            return {
+                "message": f"Continuing testing for device {serial_number}",
+                "current_stage": current_stage,
+                "redirect_to": f"test_module_{current_stage}",  # Frontend can use this
+                "device_serial": serial_number
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error continuing testing for {serial_number}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/manufacturing-orders/{mo_number}/device-types/{device_type}/summary")
+async def get_device_type_summary(
+    mo_number: str,
+    device_type: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get summary of devices for a specific device type in an MO"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Get devices for this device type
+            cursor.execute("""
+                SELECT d.serial_number, d.current_stage, d.completed_tests,
+                       CASE 
+                           WHEN d.current_stage = 'completed' THEN 'completed'
+                           WHEN array_length(d.completed_tests, 1) > 0 THEN 'in_progress'
+                           ELSE 'not_started'
+                       END as status
+                FROM devices d
+                WHERE (d.serial_number LIKE %s OR d.serial_number LIKE %s)
+                ORDER BY d.serial_number
+            """, (f"{device_type}%", f"{device_type}-%"))
+            
+            devices = cursor.fetchall()
+            
+            # Calculate summary statistics
+            total_devices = len(devices)
+            completed_count = sum(1 for d in devices if d['status'] == 'completed')
+            in_progress_count = sum(1 for d in devices if d['status'] == 'in_progress')
+            not_started_count = sum(1 for d in devices if d['status'] == 'not_started')
+            
+            # Get requirement from MO
+            cursor.execute("""
+                SELECT quantity FROM manufacturing_order_devices 
+                WHERE manufacturing_order_number = %s AND device_type = %s
+            """, (mo_number, device_type))
+            
+            requirement_row = cursor.fetchone()
+            required_quantity = requirement_row['quantity'] if requirement_row else 0
+            
+            return {
+                "mo_number": mo_number,
+                "device_type": device_type,
+                "required_quantity": required_quantity,
+                "actual_devices": total_devices,
+                "completed": completed_count,
+                "in_progress": in_progress_count,
+                "not_started": not_started_count,
+                "completion_percentage": (completed_count / required_quantity * 100) if required_quantity > 0 else 0,
+                "devices": [dict(device) for device in devices]
+            }
+            
+    except Exception as e:
+        logger.error(f"Error getting device type summary for {mo_number}/{device_type}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Enhanced device search with better filtering
+@router.get("/devices/search")
+async def search_devices(
+    q: Optional[str] = None,
+    device_type: Optional[str] = None,
+    status: Optional[str] = None,
+    mo_number: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user)
+):
+    """Enhanced device search with multiple filters"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Build dynamic query
+            base_query = """
+                SELECT d.serial_number, d.current_stage, d.completed_tests,
+                       CASE 
+                           WHEN d.current_stage = 'completed' THEN 'completed'
+                           WHEN array_length(d.completed_tests, 1) > 0 THEN 'in_progress'
+                           ELSE 'not_started'
+                       END as status
+                FROM devices d
+                WHERE 1=1
+            """
+            
+            params = []
+            
+            # Add filters
+            if q:
+                base_query += " AND d.serial_number ILIKE %s"
+                params.append(f"%{q}%")
+            
+            if device_type:
+                base_query += " AND (d.serial_number LIKE %s OR d.serial_number LIKE %s)"
+                params.extend([f"{device_type}%", f"{device_type}-%"])
+            
+            # Add status filter in HAVING clause since status is calculated
+            having_clause = ""
+            if status:
+                having_clause = f" HAVING status = %s"
+                params.append(status)
+            
+            # Add ordering and pagination
+            base_query += having_clause + " ORDER BY d.serial_number LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cursor.execute(base_query, params)
+            devices = cursor.fetchall()
+            
+            # Get total count for pagination
+            count_query = base_query.replace("LIMIT %s OFFSET %s", "").replace(
+                "SELECT d.serial_number, d.current_stage, d.completed_tests, CASE WHEN d.current_stage = 'completed' THEN 'completed' WHEN array_length(d.completed_tests, 1) > 0 THEN 'in_progress' ELSE 'not_started' END as status",
+                "SELECT COUNT(*)"
+            )
+            cursor.execute(count_query, params[:-2])  # Remove limit/offset params
+            total_count = cursor.fetchone()['count']
+            
+            return {
+                "devices": [dict(device) for device in devices],
+                "total_count": total_count,
+                "limit": limit,
+                "offset": offset,
+                "filters": {
+                    "search_query": q,
+                    "device_type": device_type,
+                    "status": status,
+                    "mo_number": mo_number
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Error searching devices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Debug Endpoints
+@router.get("/debug/devices")
+async def debug_existing_devices():
+    """Debug endpoint to see existing devices - No device type validation"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            cursor.execute("""
+                SELECT serial_number, current_stage, completed_tests
+                FROM devices 
+                ORDER BY serial_number
+                LIMIT 20
+            """)
+            
+            devices = cursor.fetchall()
+            
+            device_list = []
+            for device in devices:
                 completed_count = len(device['completed_tests'] or [])
                 
                 device_list.append({
                     "serial_number": device['serial_number'],
-                    "device_type": device_type,
+                    "device_type": None,  # Not needed
                     "current_stage": device['current_stage'],
                     "completed_tests_count": completed_count,
                     "completed_tests": device['completed_tests']
@@ -938,6 +1339,215 @@ async def debug_table_structure(table_name: str):
             
     except Exception as e:
         return {"error": str(e)}
+# Simplified Manufacturing Workflow Module
+# Add these endpoints to your existing manufacturing_workflow_module.py
+
+@router.get("/device-types/{device_type}/test-sequence-with-instructions")
+async def get_test_sequence_with_instructions(device_type: str):
+    """Get test sequence with work instruction PDFs"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Get test sequence
+            cursor.execute("""
+                SELECT test_sequence 
+                FROM device_test_sequences 
+                WHERE device_type = %s
+            """, (device_type,))
+            
+            result = cursor.fetchone()
+            if not result:
+                raise HTTPException(status_code=404, detail=f"Device type {device_type} not found")
+            
+            test_sequences = result['test_sequence']
+            if isinstance(test_sequences, list):
+                test_sequences.sort(key=lambda x: int(x.get('sequence_order', 0)))
+                
+                # Get test definitions with work instructions
+                test_ids = [test['test_id'] for test in test_sequences]
+                
+                if test_ids:
+                    placeholders = ','.join(['%s'] * len(test_ids))
+                    cursor.execute(f"""
+                        SELECT test_id, test_name, description, 
+                               estimated_duration_minutes, work_instruction_pdf
+                        FROM test_definitions 
+                        WHERE test_id IN ({placeholders})
+                    """, test_ids)
+                    
+                    test_definitions = {row['test_id']: row for row in cursor.fetchall()}
+                else:
+                    test_definitions = {}
+                
+                # Combine test sequence with definitions and PDFs
+                detailed_tests = []
+                for test in test_sequences:
+                    test_def = test_definitions.get(test['test_id'], {})
+                    is_required = test.get('is_required', True)
+                    if isinstance(is_required, str):
+                        is_required = is_required.lower() == 'true'
+                    
+                    detailed_tests.append({
+                        "test_id": test['test_id'],
+                        "test_name": test_def.get('test_name', test['test_id']),
+                        "description": test_def.get('description', ''),
+                        "sequence_order": test['sequence_order'],
+                        "is_required": is_required,
+                        "estimated_duration_minutes": test_def.get('estimated_duration_minutes', 0),
+                        "work_instruction_pdf": test_def.get('work_instruction_pdf')
+                    })
+                
+                return {"test_sequence": detailed_tests}
+            
+            return {"test_sequence": []}
+            
+    except Exception as e:
+        logger.error(f"Error getting test sequence for {device_type}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/devices/by-type/{device_type}")
+async def get_devices_by_type_simple(device_type: str):
+    """Get all devices for a device type with simplified info"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Get devices that match this device type
+            cursor.execute("""
+                SELECT d.serial_number, d.current_stage, d.completed_tests, 
+                       d.created_at, d.device_type,
+                       CASE 
+                           WHEN d.current_stage = 'completed' THEN 'completed'
+                           WHEN array_length(d.completed_tests, 1) > 0 THEN 'in_progress'
+                           ELSE 'not_started'
+                       END as status
+                FROM devices d
+                WHERE d.device_type = %s
+                ORDER BY d.created_at DESC
+            """, (device_type,))
+            
+            devices = cursor.fetchall()
+            
+            # Enhance with current test name
+            enhanced_devices = []
+            for device in devices:
+                device_dict = dict(device)
+                
+                # Get current test name if available
+                if device['current_stage'] and device['current_stage'] not in ['not_started', 'completed']:
+                    cursor.execute("""
+                        SELECT test_name FROM test_definitions 
+                        WHERE test_id = %s
+                    """, (device['current_stage'],))
+                    test_def = cursor.fetchone()
+                    device_dict['current_test_name'] = test_def['test_name'] if test_def else device['current_stage']
+                else:
+                    device_dict['current_test_name'] = None
+                
+                # Convert datetime to string
+                if device_dict['created_at']:
+                    device_dict['created_at'] = device_dict['created_at'].isoformat()
+                
+                enhanced_devices.append(device_dict)
+            
+            return {"devices": enhanced_devices}
+            
+    except Exception as e:
+        logger.error(f"Error getting devices for type {device_type}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/devices/create")
+async def create_device_simplified(
+    serial_number: str,
+    device_type: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new device with automatic test sequence setup"""
+    try:
+        serial_number = serial_number.strip()
+        device_type = device_type.strip()
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Check if device already exists
+            cursor.execute("""
+                SELECT serial_number FROM devices WHERE serial_number = %s
+            """, (serial_number,))
+            
+            if cursor.fetchone():
+                raise HTTPException(status_code=409, detail=f"Device {serial_number} already exists")
+            
+            # Get test sequence for this device type
+            cursor.execute("""
+                SELECT test_sequence FROM device_test_sequences WHERE device_type = %s
+            """, (device_type,))
+            
+            test_seq_result = cursor.fetchone()
+            if not test_seq_result:
+                raise HTTPException(status_code=404, detail=f"No test sequence found for device type: {device_type}")
+            
+            # Parse the test sequence
+            test_sequences = test_seq_result['test_sequence']
+            required_tests = []
+            first_test = 'not_started'
+            
+            if isinstance(test_sequences, list):
+                test_sequences.sort(key=lambda x: int(x.get('sequence_order', 0)))
+                
+                # Get required tests in order
+                for test in test_sequences:
+                    is_required = test.get('is_required', True)
+                    if isinstance(is_required, str):
+                        is_required = is_required.lower() == 'true'
+                    if is_required:
+                        required_tests.append(test['test_id'])
+                
+                # Set first test as current stage
+                if required_tests:
+                    first_test = required_tests[0]
+            
+            # Insert device
+            cursor.execute("""
+                INSERT INTO devices (
+                    serial_number, 
+                    device_type,
+                    current_stage, 
+                    completed_tests,
+                    required_tests,
+                    created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                RETURNING serial_number, device_type, current_stage, created_at
+            """, (serial_number, device_type, first_test, [], required_tests))
+            
+            new_device = cursor.fetchone()
+            conn.commit()
+            
+            # Log the action
+            log_action(
+                current_user['user_id'],
+                'create_device',
+                'manufacturing_workflow',
+                f"Created device {serial_number} of type {device_type}"
+            )
+            
+            return {
+                "message": f"Device {serial_number} created successfully",
+                "device": {
+                    "serial_number": new_device['serial_number'],
+                    "device_type": new_device['device_type'],
+                    "current_stage": new_device['current_stage'],
+                    "created_at": new_device['created_at'].isoformat()
+                }
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating device {serial_number}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Initialize DB pool on module load
 init_db_pool()

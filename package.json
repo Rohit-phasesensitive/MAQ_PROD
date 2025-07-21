@@ -7,6 +7,7 @@
   "homepage": "./",
   "scripts": {
     "start": "react-scripts start",
+    "start-network": "HOST=0.0.0.0 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
@@ -24,6 +25,7 @@
     "clean-backend": "cd backend && rm -rf dist build *.spec",
     "clean-all": "npm run clean-cache && npm run clean-backend && rm -rf dist build"
   },
+
   "build": {
     "appId": "com.psi.maq-lab-manager",
     "productName": "MAQ Lab Manager",
@@ -153,3 +155,4 @@
     "url": "https://github.com/your-org/assembly-lab-manager.git"
   }
 }
+

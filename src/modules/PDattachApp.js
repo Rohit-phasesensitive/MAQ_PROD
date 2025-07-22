@@ -76,17 +76,7 @@ const PDattach = () => {
       </div>
       
       {/* Features List */}
-      <div style={{
-        marginTop: '40px',
-        textAlign: 'left',
-        background: 'rgba(255, 255, 255, 0.1)',
-        padding: '25px',
-        borderRadius: '15px',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.2)'
-      }}>
-        
-      </div>
+      
     </div>
   );
 };

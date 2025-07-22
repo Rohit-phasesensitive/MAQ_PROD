@@ -323,7 +323,7 @@ const ChipInspection = ({ user, addNotification }) => {
             >
               ← Back to Workflow
             </button>
-        {/* {Test Context Banner */}
+        {/* Test Context Banner
         {isTestMode && testContext && (
           <div className="test-context-banner">
             <div className="test-info">
@@ -338,7 +338,7 @@ const ChipInspection = ({ user, addNotification }) => {
               ← Back to Workflow
             </button>
           </div>
-        )} 
+        )} */}
         
         <div className="module-actions">
           {!isTestMode && (

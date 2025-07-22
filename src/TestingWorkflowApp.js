@@ -113,13 +113,16 @@ const SimplifiedTestingWorkflow = () => {
       return;
     }
     
-    // Store context for return navigation
+    // Store context for return navigation with full state
     const testContext = {
       deviceSerialNumber: device.serial_number,
       testId: device.current_stage,
       returnTo: 'testing-workflow',
+      returnMode: 'device-type-view',
       selectedMO: selectedMO,
-      selectedDeviceType: selectedDeviceType
+      selectedDeviceType: selectedDeviceType,
+      manufacturingOrderNumber: selectedMO?.manufacturing_order_number,
+      productName: selectedMO?.product_name
     };
     
     localStorage.setItem('testContext', JSON.stringify(testContext));
@@ -183,6 +186,34 @@ const SimplifiedTestingWorkflow = () => {
     }
   }, [selectedDeviceType]);
 
+  // Check for return navigation from test modules
+  useEffect(() => {
+    const checkReturnContext = () => {
+      const testContext = localStorage.getItem('testContext');
+      if (testContext) {
+        try {
+          const context = JSON.parse(testContext);
+          if (context.returnTo === 'testing-workflow' && context.returnMode === 'device-type-view') {
+            // Restore the previous state
+            if (context.selectedMO && context.selectedDeviceType) {
+              setSelectedMO(context.selectedMO);
+              setSelectedDeviceType(context.selectedDeviceType);
+              setMode('device-type-view');
+              // Clear the context after using it
+              localStorage.removeItem('testContext');
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing test context:', error);
+          localStorage.removeItem('testContext');
+        }
+      }
+    };
+
+    // Check on component mount
+    checkReturnContext();
+  }, []);
+
   // Manufacturing Orders List
   if (mode === 'mo-list') {
     return (
@@ -199,7 +230,7 @@ const SimplifiedTestingWorkflow = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {manufacturingOrders.map((mo) => (
-              <div key={mo.manufacturing_order_number} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer">
+              <div key={mo.manufacturing_order_number} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-xl font-semibold">{mo.manufacturing_order_number}</h3>
@@ -214,7 +245,8 @@ const SimplifiedTestingWorkflow = () => {
                   </span>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Fixed device types section with flexbox instead of grid */}
+                <div className="flex flex-wrap gap-2">
                   {Object.entries(mo.device_types || {}).map(([type, data]) => (
                     <button
                       key={type}
@@ -223,10 +255,10 @@ const SimplifiedTestingWorkflow = () => {
                         setSelectedDeviceType(type);
                         setMode('device-type-view');
                       }}
-                      className="bg-gray-50 rounded p-3 text-left hover:bg-blue-50 transition-colors"
+                      className="bg-gray-50 rounded px-3 py-2 text-left hover:bg-blue-50 transition-colors border border-gray-200 hover:border-blue-300 min-w-[120px] flex-shrink-0"
                     >
-                      <div className="font-medium">{type}</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="font-medium text-sm">{type}</div>
+                      <div className="text-xs text-gray-600">
                         {data.completed || 0}/{data.required || 0}
                       </div>
                     </button>

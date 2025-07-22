@@ -82,16 +82,16 @@ const TAB_CONFIG = [
   { id: 'user-management', name: 'User Management', icon: '👥', component: UserManagement, roles: ['admin'] },
   { id: 'Manufacturing-orders', name: 'Create MO', icon: '🆕📝' , component: ManufacturingOrders, roles: ['admin'] },
   { id: 'dashboard', name: 'Dashboard', icon: '🏠', component: null, roles: ['admin', 'viewer'] },
-  { id: 'chip-inspection', name: 'Chip Inspection', icon: '🔍', component: ChipinspectionApp, roles: ['admin', 'operator'] },
-  { id: 'housing-prep', name: 'Housing Inspection', icon: '🔍', component: HousingprepApp, roles: ['admin', 'operator'] },
+  { id: 'housing-prep', name: 'Housing Preparation', icon: '🔍', component: HousingprepApp, roles: ['admin', 'operator'] },
+  { id: 'chip-inspection', name: 'Chip Preparation', icon: '🔍', component: ChipinspectionApp, roles: ['admin', 'operator'] },
   { id: 'wirebond', name: 'Wire Bond', icon: '➖⚪➖', component: WirebondApp, roles: ['admin', 'operator'] },
-  { id: 's11-testing', name: 'S11', icon: '📈',component: S11TestingApp, roles: ['admin', 'operator'] },
+  { id: 's11-testing', name: 'S11 Test', icon: '📈',component: S11TestingApp, roles: ['admin', 'operator'] },
   { id: 'fiber-attach', name: 'Fiber Attach', icon: '➖🔲➖', component: FiberattachApp, roles: ['admin', 'operator'] },
-  { id: 'dcpi-testing', name: 'DCVπ', icon: '📈', component: DCvpitestingApp, roles: ['admin', 'operator'] },
-  { id: 's21-testing', name: 'S21', icon: '📈', component: S21TestingApp, roles: ['admin', 'operator'] },
-  { id: 'twotone-testing', name: '1 GHz Vπ', icon: '📈', component: TwotonetestingApp, roles: ['admin', 'operator'] },
+  { id: 'dcpi-testing', name: 'DCVπ Test', icon: '📈', component: DCvpitestingApp, roles: ['admin', 'operator'] },
+  { id: 's21-testing', name: 'S21 Test', icon: '📈', component: S21TestingApp, roles: ['admin', 'operator'] },
+  { id: 'twotone-testing', name: '1 GHz Vπ Test', icon: '📈', component: TwotonetestingApp, roles: ['admin', 'operator'] },
   { id: 'pd-attach', name: 'PD Attach', icon: '⏹️', component: PDattachApp, roles: ['admin', 'operator'] },
-  { id: 'rfvpi-testing', name: 'Phase modulator Vπ', icon: '📶' , component: RFvpitestingApp, roles: ['admin', 'operator'] },
+  { id: 'rfvpi-testing', name: 'Phase modulator Vπ Test', icon: '📶' , component: RFvpitestingApp, roles: ['admin', 'operator'] },
   // {  id: 'testing-workflow', name: 'Test Flow',  icon: '🧪',  component: TestingWorkflowApp,  roles: ['admin', 'operator']},
 
   
@@ -431,7 +431,7 @@ const renderDashboard = () => (
             <div className="company-logo">
               <img src="/logo.png" alt="Company Logo" className="logo-image" />
             </div>
-            <h1>MAQ_Lab_Manager</h1>
+            <h1>MAQ LAB MANAGER</h1>
             
           </div>
 
@@ -488,8 +488,8 @@ const renderDashboard = () => (
             <img src="/logo.png" alt="Company Logo" className="nav-logo-image" />
           </div>
         <div className="header-left">
-          <h1>MAQ_Lab_Manager</h1>
-          <span className="version">v1.0</span>
+          <h1>MAQ LAB MANAGER</h1>
+          
         </div>
         
 
@@ -507,13 +507,7 @@ const renderDashboard = () => (
         </div>
 
         <div className="header-right">
-          <div className="notifications-badge">
-            🔔
-            {notifications.length > 0 && (
-              <span className="badge-count">{notifications.length}</span>
-            )}
-          </div>
-
+          
           <div className="user-info">
             <span className="user-name">👤 {user.username}</span>
             <span className="user-role">({user.role})</span>

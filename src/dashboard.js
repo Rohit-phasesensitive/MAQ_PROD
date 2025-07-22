@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-
+import './dashboard.css'
 const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 // API Configuration
@@ -63,94 +63,6 @@ const apiService = {
   }
 };
 
-// Debug Panel Component
-const DebugPanel = ({ systemStatus, analyticsData, isVisible, onToggle }) => {
-  if (!isVisible) {
-    return (
-      <button
-        onClick={onToggle}
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          padding: '10px 15px',
-          backgroundColor: '#3b82f6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          fontSize: '14px',
-          zIndex: 1000
-        }}
-      >
-        Show Debug Info
-      </button>
-    );
-  }
-
-  return (
-    <div style={{
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      width: '400px',
-      maxHeight: '70vh',
-      backgroundColor: 'white',
-      border: '1px solid #d1d5db',
-      borderRadius: '8px',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-      overflow: 'auto',
-      zIndex: 1000
-    }}>
-      <div style={{
-        padding: '15px',
-        borderBottom: '1px solid #e5e7eb',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <h3 style={{ margin: 0, fontSize: '16px' }}>Debug Information</h3>
-        <button
-          onClick={onToggle}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '18px',
-            cursor: 'pointer',
-            color: '#6b7280'
-          }}
-        >
-          ×
-        </button>
-      </div>
-      
-      {/* <div style={{ padding: '15px' }}>
-        <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#374151' }}>System Status Raw Data:</h4>
-        <pre style={{
-          backgroundColor: '#f9fafb',
-          padding: '10px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          overflow: 'auto',
-          marginBottom: '15px'
-        }}>
-          {JSON.stringify(systemStatus, null, 2)}
-        </pre>
-        
-        <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#374151' }}>Analytics Data Raw Data:</h4>
-        <pre style={{
-          backgroundColor: '#f9fafb',
-          padding: '10px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          overflow: 'auto'
-        }}>
-          {JSON.stringify(analyticsData, null, 2)}
-        </pre>
-      </div> */}
-    </div>
-  );
-};
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -433,7 +345,7 @@ const ConnectedDashboard = () => {
   return (
     <div style={{
       padding: '20px',
-      backgroundColor: '#f9fafb',
+      background: 'linear-gradient(deg, #927cdf 0%, #e2e8f0 100%)',
       minHeight: '100vh'
     }}>
       {/* Header */}
@@ -603,31 +515,32 @@ const ConnectedDashboard = () => {
               border: '1px solid #e5e7eb'
             }}>
               <h3 style={{ margin: '0 0 20px 0', color: '#1f2937', fontSize: '18px' }}>
-                Overall Pass/Fail Ratio
-              </h3>
-              <div style={{ height: '240px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
+  Overall Pass/Fail Ratio
+</h3>
+<div style={{ height: '300px' }}>
+  <ResponsiveContainer width="100%" height="100%">
+    <PieChart>
+      <Pie
+        data={pieData}
+        cx="50%"
+        cy="45%"
+        labelLine={false}
+        // label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+        outerRadius={100}
+        fill="#8884d8"
+        dataKey="value"
+      >
+        {pieData.map((entry, index) => (
+          <Cell key={`cell-${index}`} fill={entry.color} />
+        ))}
+      </Pie>
+      <Tooltip />
+      <Legend />
+    </PieChart>
+  </ResponsiveContainer>
+</div>
+</div>
+</div>
         </>
       )}
 

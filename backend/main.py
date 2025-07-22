@@ -26,7 +26,7 @@ from modules.manufacturing_workflow_module import router as manufacturing_router
 # from fastapi.middleware.cors import CORSMiddleware
 import databases
 # from apps import router as analytics_router
-from apps import create_analytics_router
+from dashboard import create_analytics_router
 # from apps import app
 # Load environment variables
 load_dotenv()

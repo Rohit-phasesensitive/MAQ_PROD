@@ -460,7 +460,7 @@ body {
 .main-content {
   flex: 1;
   padding: 30px;
-  background-color: #f5f7fa;
+  background: linear-gradient(359deg, #f5f7fa 0%, #e8f2ff 50%, #927fe9 100%);
   overflow-y: auto;
 }
 
@@ -503,7 +503,7 @@ body {
 }
 
 .dashboard-card {
-  background: white;
+  background: linear-gradient(276deg, #e5e2f1 0%, #e2e8f0 100%);
   padding: 25px;
   border-radius: 15px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);

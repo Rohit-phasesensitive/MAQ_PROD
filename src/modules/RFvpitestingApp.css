@@ -804,7 +804,7 @@
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .rf-vpi-module {
-    background-color: #1a1a1a;
+    background: linear-gradient(276deg, #bbadec 0%, #e2e8f0 100%);
     color: #ffffff;
   }
   
@@ -815,7 +815,7 @@
   .chart-card,
   .info-card,
   .history-card {
-    background-color: #2d2d2d;
+    background: linear-gradient(276deg, #f1f0f3 0%, #e2e8f0 100%);
     border-color: #404040;
     color: #ffffff;
   }
@@ -828,17 +828,17 @@
   }
   
   .logs-container {
-    background-color: #3d3d3d;
+    background-color: #ffffff;
     border-color: #505050;
   }
   
   .info-label,
   .detail-row .label {
-    color: #cccccc;
+    color: #000000;
   }
   
   .log-time {
-    color: #999999;
+    color: #000000;
   }
   
   .log-message {

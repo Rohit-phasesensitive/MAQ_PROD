@@ -754,10 +754,10 @@ const ManufacturingOrders = ({ user, addNotification }) => {
                   <label>Created:</label>
                   <span>{new Date(selectedOrder.created_at).toLocaleString()}</span>
                 </div>
-                <div className="detail-item">
+                {/* <div className="detail-item">
                   <label>Created By:</label>
                   <span>{selectedOrder.created_by_username}</span>
-                </div>
+                </div> */}
                 {selectedOrder.due_date && (
                   <div className="detail-item">
                     <label>Due Date:</label>

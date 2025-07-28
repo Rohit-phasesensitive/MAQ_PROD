@@ -209,7 +209,7 @@ const ModulatorTestUI = () => {
     <div className="modulator-testing-module">
       {/* Header */}
       <div className="module-header">
-        <h2>🔧 DC Vπ Test</h2>
+        <h2>📈 DC Vπ Test</h2>
         <div className={`connection-status ${instrumentStatus === 'Connected' ? 'connected' : 'disconnected'}`}>
           <span className="status-indicator">●</span>
           Status: {instrumentStatus}
